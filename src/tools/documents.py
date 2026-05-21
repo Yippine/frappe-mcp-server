@@ -10,7 +10,7 @@ import json
 
 from ..frappe_api import get_client, FrappeApiError
 from ..auth import validate_api_credentials
-from .filter_parser import format_filters_for_api, FILTER_SYNTAX_DOCS
+from .filter_parser import format_filters_for_api, to_frappe_array_filters, FILTER_SYNTAX_DOCS
 
 
 def _extract_linked_docs_from_error(error_message: str) -> List[Dict[str, str]]:
@@ -390,7 +390,7 @@ def register_tools(mcp: Any) -> None:
             params = {}
             parsed_filters = format_filters_for_api(filters)
             if parsed_filters:
-                params["filters"] = json.dumps(parsed_filters)
+                params["filters"] = json.dumps(to_frappe_array_filters(doctype, parsed_filters))
             if fields:
                 # Convert comma-separated string to list
                 field_list = [f.strip() for f in fields.split(',')]
@@ -492,24 +492,23 @@ def register_tools(mcp: Any) -> None:
         """
         try:
             client = get_client()
-            
-            # Build query parameters for counting
-            params = {
-                "fields": json.dumps(["count(name) as count"])
-            }
-            
+
+            # Use frappe.client.get_count which properly supports COUNT queries.
+            # The /api/resource/{doctype}?fields=["count(name) as count"] approach
+            # returns HTTP 417 because Frappe REST API does not support aggregate functions.
+            params = {"doctype": doctype}
+
             # Parse and add filters if provided
             parsed_filters = format_filters_for_api(filters)
             if parsed_filters:
-                params["filters"] = json.dumps(parsed_filters)
-            
+                params["filters"] = json.dumps(to_frappe_array_filters(doctype, parsed_filters))
+
             # Make API request to count documents
-            response = await client.get(f"api/resource/{doctype}", params=params)
-            
-            if "data" in response and response["data"]:
-                count_result = response["data"][0]
-                count = count_result.get("count", 0)
-                
+            response = await client.get("api/method/frappe.client.get_count", params=params)
+
+            if "message" in response:
+                count = response["message"]
+
                 # Format response based on whether filters were applied
                 if parsed_filters:
                     return f"Found {count} {doctype} documents matching filters: {filters}"
@@ -517,7 +516,7 @@ def register_tools(mcp: Any) -> None:
                     return f"Found {count} {doctype} documents total"
             else:
                 return f"No data returned for {doctype} count"
-                
+
         except Exception as error:
             return _format_error_response(error, "count_documents")
     

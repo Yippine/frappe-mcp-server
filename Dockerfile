@@ -20,7 +20,7 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 
 # Copy dependency files
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 
 # Install dependencies into virtual environment
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -63,11 +63,11 @@ WORKDIR /app
 # CPU limit: 1 core, Memory limit: 2GB (enforced by docker-compose)
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sys; from src.frappe_mcp_server import __version__; print(__version__); sys.exit(0)"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD python -c "import socket, sys; s=socket.socket(); s.settimeout(5); s.connect(('localhost',8094)); s.close(); sys.exit(0)"
 
 # Default command - run the MCP server
-ENTRYPOINT ["python", "-m", "src.frappe_mcp_server.main"]
+ENTRYPOINT ["python", "-m", "src.main"]
 CMD []
 
 # Development stage - includes dev dependencies and tools

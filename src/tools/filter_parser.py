@@ -198,6 +198,20 @@ def format_filters_for_api(filters: Optional[str]) -> Optional[Dict[str, Any]]:
     return parse_filter_string(filters)
 
 
+def to_frappe_array_filters(doctype: str, filters: dict) -> list:
+    """Convert filters dict to Frappe REST API array-of-arrays format.
+
+    Frappe REST API expects: [["DocType", "field", "operator", "value"], ...]
+    """
+    result = []
+    for field, condition in filters.items():
+        if isinstance(condition, list) and len(condition) == 2 and isinstance(condition[0], str):
+            result.append([doctype, field, condition[0], condition[1]])
+        else:
+            result.append([doctype, field, "=", condition])
+    return result
+
+
 # Filter syntax documentation for use in tool docstrings
 FILTER_SYNTAX_DOCS = """
 Filter Syntax:
